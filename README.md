@@ -1,5 +1,5 @@
 # CycleGAN
-Tensorflow implementation of CycleGAN.
+Tensorflow implementation of CycleGAN. (This is only me playing with the code, original is at https://github.com/hardikbansal/CycleGAN/)
 
 1. [Original implementation](https://github.com/junyanz/CycleGAN/)
 2. [Paper](https://arxiv.org/abs/1703.10593)

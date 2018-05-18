@@ -66,19 +66,21 @@ def build_generator_resnet_6blocks(inputgen, name="generator"):
 
         out_gen = tf.nn.tanh(o_c6,"t1")
 
-
         return out_gen
+
 
 def build_generator_resnet_9blocks(inputgen, name="generator"):
     with tf.variable_scope(name):
         f = 7
         ks = 3
-        
+
+        # Encoding
         pad_input = tf.pad(inputgen,[[0, 0], [ks, ks], [ks, ks], [0, 0]], "REFLECT")
         o_c1 = general_conv2d(pad_input, ngf, f, f, 1, 1, 0.02,name="c1")
         o_c2 = general_conv2d(o_c1, ngf*2, ks, ks, 2, 2, 0.02,"SAME","c2")
         o_c3 = general_conv2d(o_c2, ngf*4, ks, ks, 2, 2, 0.02,"SAME","c3")
 
+        # Transformation
         o_r1 = build_resnet_block(o_c3, ngf*4, "r1")
         o_r2 = build_resnet_block(o_r1, ngf*4, "r2")
         o_r3 = build_resnet_block(o_r2, ngf*4, "r3")
@@ -89,6 +91,7 @@ def build_generator_resnet_9blocks(inputgen, name="generator"):
         o_r8 = build_resnet_block(o_r7, ngf*4, "r8")
         o_r9 = build_resnet_block(o_r8, ngf*4, "r9")
 
+        # Decoding
         o_c4 = general_deconv2d(o_r9, [batch_size,128,128,ngf*2], ngf*2, ks, ks, 2, 2, 0.02,"SAME","c4")
         o_c5 = general_deconv2d(o_c4, [batch_size,256,256,ngf], ngf, ks, ks, 2, 2, 0.02,"SAME","c5")
         o_c6 = general_conv2d(o_c5, img_layer, f, f, 1, 1, 0.02,"SAME","c6",do_relu=False)

@@ -65,6 +65,7 @@ class CycleGAN():
         _, image_file_A = image_reader.read(filename_queue_A)
         _, image_file_B = image_reader.read(filename_queue_B)
 
+        # Read as 256x256x3 tensors, scaled to [0,1] interval
         self.image_A = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_jpeg(image_file_A),[256,256]),127.5),1)
         self.image_B = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_jpeg(image_file_B),[256,256]),127.5),1)
 
@@ -96,12 +97,12 @@ class CycleGAN():
 
         for i in range(max_images): 
             image_tensor = sess.run(self.image_A)
-            if(image_tensor.size() == img_size*batch_size*img_layer):
+            if(image_tensor.size == img_size*batch_size*img_layer):
                 self.A_input[i] = image_tensor.reshape((batch_size,img_height, img_width, img_layer))
 
         for i in range(max_images):
             image_tensor = sess.run(self.image_B)
-            if(image_tensor.size() == img_size*batch_size*img_layer):
+            if(image_tensor.size == img_size*batch_size*img_layer):
                 self.B_input[i] = image_tensor.reshape((batch_size,img_height, img_width, img_layer))
 
 
@@ -160,14 +161,19 @@ class CycleGAN():
         *_trainer -> Variaous trainer for above loss functions
         *_summ -> Summary variables for above loss functions'''
 
+        # difference between the original image and the cyclic image should be as small as possible
         cyc_loss = tf.reduce_mean(tf.abs(self.input_A-self.cyc_A)) + tf.reduce_mean(tf.abs(self.input_B-self.cyc_B))
-        
+
+        # generated images should be marked by discriminator as 1
         disc_loss_A = tf.reduce_mean(tf.squared_difference(self.fake_rec_A,1))
         disc_loss_B = tf.reduce_mean(tf.squared_difference(self.fake_rec_B,1))
-        
+
+        # Generator loss
         g_loss_A = cyc_loss*10 + disc_loss_B
         g_loss_B = cyc_loss*10 + disc_loss_A
 
+        # Discriminator loss: discriminator should mark all generated images as 0 and all original images as 1
+        # d_loss_A = (Da(Gba(b))-0)^2 + (Da(a) - 1)^2
         d_loss_A = (tf.reduce_mean(tf.square(self.fake_pool_rec_A)) + tf.reduce_mean(tf.squared_difference(self.rec_A,1)))/2.0
         d_loss_B = (tf.reduce_mean(tf.square(self.fake_pool_rec_B)) + tf.reduce_mean(tf.squared_difference(self.rec_B,1)))/2.0
 
@@ -244,8 +250,10 @@ class CycleGAN():
         self.loss_calc()
       
         # Initializing the global variables
-        init = tf.global_variables_initializer()
-        saver = tf.train.Saver()     
+        init = (tf.global_variables_initializer(), tf.local_variables_initializer())
+        saver = tf.train.Saver()
+
+        print('Variables initialized...')
 
         with tf.Session() as sess:
             sess.run(init)
@@ -264,7 +272,7 @@ class CycleGAN():
                 os.makedirs(check_dir)
 
             # Training Loop
-            for epoch in range(sess.run(self.global_step),100):                
+            for epoch in range(sess.run(self.global_step),100):
                 print ("In the epoch ", epoch)
                 saver.save(sess,os.path.join(check_dir,"cyclegan"),global_step=epoch)
 
@@ -287,27 +295,26 @@ class CycleGAN():
 
                     _, fake_B_temp, summary_str = sess.run([self.g_A_trainer, self.fake_B, self.g_A_loss_summ],feed_dict={self.input_A:self.A_input[ptr], self.input_B:self.B_input[ptr], self.lr:curr_lr})
                     
-                    writer.add_summary(summary_str, epoch*max_images + ptr)                    
+                    writer.add_summary(summary_str, epoch*max_images + ptr)
+
                     fake_B_temp1 = self.fake_image_pool(self.num_fake_inputs, fake_B_temp, self.fake_images_B)
                     
                     # Optimizing the D_B network
                     _, summary_str = sess.run([self.d_B_trainer, self.d_B_loss_summ],feed_dict={self.input_A:self.A_input[ptr], self.input_B:self.B_input[ptr], self.lr:curr_lr, self.fake_pool_B:fake_B_temp1})
                     writer.add_summary(summary_str, epoch*max_images + ptr)
                     
-                    
                     # Optimizing the G_B network
                     _, fake_A_temp, summary_str = sess.run([self.g_B_trainer, self.fake_A, self.g_B_loss_summ],feed_dict={self.input_A:self.A_input[ptr], self.input_B:self.B_input[ptr], self.lr:curr_lr})
 
                     writer.add_summary(summary_str, epoch*max_images + ptr)
-                    
-                    
+
                     fake_A_temp1 = self.fake_image_pool(self.num_fake_inputs, fake_A_temp, self.fake_images_A)
 
                     # Optimizing the D_A network
                     _, summary_str = sess.run([self.d_A_trainer, self.d_A_loss_summ],feed_dict={self.input_A:self.A_input[ptr], self.input_B:self.B_input[ptr], self.lr:curr_lr, self.fake_pool_A:fake_A_temp1})
 
                     writer.add_summary(summary_str, epoch*max_images + ptr)
-                    
+
                     self.num_fake_inputs+=1
             
                         
